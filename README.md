@@ -1,16 +1,16 @@
 <p align="center">
   <img src="./src/assets/img/win.gif" width="95%" title="Win"></br></br>
-  <img src="./src/assets/img/zamacasino.png" width="150" title="Logo">
+  <img src="./src/assets/img/fheroulette.png" width="150" title="Logo">
 </p>
 
 
-### <img src="./src/assets/img/zamacasino.png" width="20" /> Zamacasino
+### <img src="./src/assets/img/fheroulette.png" width="20" /> FHERoulette
 
 A fully on-chain Roulette game powered by Fully Homomorphic Encryption (FHE). Play privately, verify publicly.
 
 </br>
 
-### <img src="./src/assets/img/zamacasino.png" width="20" /> What is this?
+### <img src="./src/assets/img/fheroulette.png" width="20" /> What is this?
 
 (This is a demo application and is not associated with real money.)
 
@@ -27,7 +27,7 @@ Provably Fair: The winning number is generated on-chain using FHE.randEuint8 and
 
 </br>
 
-### <img src="./src/assets/img/zamacasino.png" width="20" /> Gameplay
+### <img src="./src/assets/img/fheroulette.png" width="20" /> Gameplay
 
 Betting: You select your numbers amount by left clicking on the board and the chip section in right side.
 
@@ -48,7 +48,7 @@ Play: After you place your bet click plat button and grant permission from your 
 
 </br>
 
-### <img src="./src/assets/img/zamacasino.png" width="20" /> Features
+### <img src="./src/assets/img/fheroulette.png" width="20" /> Features
 
 Privacy First: Inputs and Balances are encrypted using FHE.
 
@@ -66,7 +66,7 @@ Integrated Faucet: Built-in faucet to claim demo tokens for testing.
 
 </br>
 
-### <img src="./src/assets/img/zamacasino.png" width="20" /> Tech Stack
+### <img src="./src/assets/img/fheroulette.png" width="20" /> Tech Stack
 
 Frontend: React.js
 
@@ -82,7 +82,7 @@ Development Environment: Hardhat
 
 </br>
 
-### <img src="./src/assets/img/zamacasino.png" width="20" /> Prerequisites
+### <img src="./src/assets/img/fheroulette.png" width="20" /> Prerequisites
 
 Before you start, make sure you have:
 
@@ -96,13 +96,13 @@ Ethereum Sepolia Network added to MetaMask.
 
 </br>
 
-### <img src="./src/assets/img/zamacasino.png" width="20" /> Installation & Setup
+### <img src="./src/assets/img/fheroulette.png" width="20" /> Installation & Setup
 
 Clone the repository:
 
 ```bash
-git clone https://github.com/GallagherEth /Zamacasino.git
-cd Zamacasino
+git clone https://github.com/0xGallagher/FHERoulette.git
+cd FHERoulette
 ```
 
 Install Dependencies:
