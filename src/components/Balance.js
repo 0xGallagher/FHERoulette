@@ -1,11 +1,28 @@
 import { useContext, useEffect, memo } from "react";
 import { MyContext } from "./Context.js";
+import { ethers } from "ethers";
 
 const Balance = () => {
-    const { balance, setFaucetModal, account, setAccount, connectWallet, disconnectWallet } = useContext(MyContext);
+    const { balance, setBalance, setFaucetModal, account, setAccount } = useContext(MyContext);
 
-const shortAddress = (addr) =>
+    const shortAddress = (addr) =>
         addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "";
+
+    const connectWallet = async () => {
+        if (!window.ethereum) return alert("MetaMask is not active!");
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await provider.send("eth_requestAccounts", []);
+
+        if (accounts.length > 0) {
+            setAccount(accounts[0]);
+        }
+    };
+
+
+    const disconnectWallet = () => {
+        setAccount(null);
+        setBalance(0);
+    };
 
 
     useEffect(() => {

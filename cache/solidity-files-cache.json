@@ -1,10 +1,10 @@
 {
   "_format": "hh-sol-cache-2",
   "files": {
-    "C:\\Users\\Sedat Yetiş\\Desktop\\Oyun, Kitap, Eğlence\\React\\React Tutorial\\Tekrar\\zama-roulette-app\\contracts\\Roulette.sol": {
-      "lastModificationDate": 1761865748335,
-      "contentHash": "8f7238de4d7df948a4472862e6506914",
-      "sourceName": "contracts/Roulette.sol",
+    "C:\\Users\\Sedat Yetiş\\Desktop\\Oyun, Kitap, Eğlence\\React\\React Tutorial\\Tekrar\\Zamacasino\\contracts\\FHERoulette.sol": {
+      "lastModificationDate": 1764347824978,
+      "contentHash": "147fae9f4b8cfeefc50d218442e20335",
+      "sourceName": "contracts/FHERoulette.sol",
       "solcConfig": {
         "version": "0.8.24",
         "settings": {
@@ -30,18 +30,19 @@
         }
       },
       "imports": [
-        "@fhevm/solidity/lib/FHE.sol"
+        "@fhevm/solidity/lib/FHE.sol",
+        "@fhevm/solidity/config/ZamaConfig.sol"
       ],
       "versionPragmas": [
         "^0.8.24"
       ],
       "artifacts": [
-        "Roulette"
+        "FHERoulette"
       ]
     },
-    "C:\\Users\\Sedat Yetiş\\Desktop\\Oyun, Kitap, Eğlence\\React\\React Tutorial\\Tekrar\\zama-roulette-app\\node_modules\\@fhevm\\solidity\\lib\\FHE.sol": {
-      "lastModificationDate": 1761843715740,
-      "contentHash": "4595eb92a31223262d4e29a27c938d97",
+    "C:\\Users\\Sedat Yetiş\\Desktop\\Oyun, Kitap, Eğlence\\React\\React Tutorial\\Tekrar\\Zamacasino\\node_modules\\@fhevm\\solidity\\lib\\FHE.sol": {
+      "lastModificationDate": 1764323424457,
+      "contentHash": "a3654ad3694e201ea093182154462272",
       "sourceName": "@fhevm/solidity/lib/FHE.sol",
       "solcConfig": {
         "version": "0.8.24",
@@ -77,14 +78,13 @@
       ],
       "artifacts": [
         "FHE",
-        "IDecryptionOracle",
         "IKMSVerifier"
       ]
     },
-    "C:\\Users\\Sedat Yetiş\\Desktop\\Oyun, Kitap, Eğlence\\React\\React Tutorial\\Tekrar\\zama-roulette-app\\node_modules\\@fhevm\\solidity\\lib\\FheType.sol": {
-      "lastModificationDate": 1761843715740,
-      "contentHash": "65f472a3e319ba73ac6b19a5e8660d15",
-      "sourceName": "@fhevm/solidity/lib/FheType.sol",
+    "C:\\Users\\Sedat Yetiş\\Desktop\\Oyun, Kitap, Eğlence\\React\\React Tutorial\\Tekrar\\Zamacasino\\node_modules\\@fhevm\\solidity\\config\\ZamaConfig.sol": {
+      "lastModificationDate": 1764323424457,
+      "contentHash": "d33d3a7d4f7659005ac6493a3b3bb844",
+      "sourceName": "@fhevm/solidity/config/ZamaConfig.sol",
       "solcConfig": {
         "version": "0.8.24",
         "settings": {
@@ -109,14 +109,20 @@
           }
         }
       },
-      "imports": [],
+      "imports": [
+        "../lib/FHE.sol",
+        "../lib/Impl.sol"
+      ],
       "versionPragmas": [
         "^0.8.24"
       ],
-      "artifacts": []
+      "artifacts": [
+        "ZamaConfig",
+        "ZamaEthereumConfig"
+      ]
     },
-    "C:\\Users\\Sedat Yetiş\\Desktop\\Oyun, Kitap, Eğlence\\React\\React Tutorial\\Tekrar\\zama-roulette-app\\node_modules\\encrypted-types\\EncryptedTypes.sol": {
-      "lastModificationDate": 1761843715737,
+    "C:\\Users\\Sedat Yetiş\\Desktop\\Oyun, Kitap, Eğlence\\React\\React Tutorial\\Tekrar\\Zamacasino\\node_modules\\encrypted-types\\EncryptedTypes.sol": {
+      "lastModificationDate": 1763586288402,
       "contentHash": "521a624fad71cd29fc4b7c443b41bb86",
       "sourceName": "encrypted-types/EncryptedTypes.sol",
       "solcConfig": {
@@ -149,9 +155,9 @@
       ],
       "artifacts": []
     },
-    "C:\\Users\\Sedat Yetiş\\Desktop\\Oyun, Kitap, Eğlence\\React\\React Tutorial\\Tekrar\\zama-roulette-app\\node_modules\\@fhevm\\solidity\\lib\\Impl.sol": {
-      "lastModificationDate": 1761843715741,
-      "contentHash": "82d95a375319ded89a84a9323575b351",
+    "C:\\Users\\Sedat Yetiş\\Desktop\\Oyun, Kitap, Eğlence\\React\\React Tutorial\\Tekrar\\Zamacasino\\node_modules\\@fhevm\\solidity\\lib\\Impl.sol": {
+      "lastModificationDate": 1764323424457,
+      "contentHash": "6039bec93defbef7e3e2729c62b95194",
       "sourceName": "@fhevm/solidity/lib/Impl.sol",
       "solcConfig": {
         "version": "0.8.24",
@@ -188,6 +194,76 @@
         "IFHEVMExecutor",
         "IInputVerifier",
         "Impl"
+      ]
+    },
+    "C:\\Users\\Sedat Yetiş\\Desktop\\Oyun, Kitap, Eğlence\\React\\React Tutorial\\Tekrar\\Zamacasino\\node_modules\\@fhevm\\solidity\\lib\\FheType.sol": {
+      "lastModificationDate": 1764323424457,
+      "contentHash": "65f472a3e319ba73ac6b19a5e8660d15",
+      "sourceName": "@fhevm/solidity/lib/FheType.sol",
+      "solcConfig": {
+        "version": "0.8.24",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.24"
+      ],
+      "artifacts": []
+    },
+    "C:\\Users\\Sedat Yetiş\\Desktop\\Oyun, Kitap, Eğlence\\React\\React Tutorial\\Tekrar\\Zamacasino\\contracts\\Roulette.sol": {
+      "lastModificationDate": 1763480730657,
+      "contentHash": "6e3ee9f01f64a04e9003c4e4fb2e789b",
+      "sourceName": "contracts/Roulette.sol",
+      "solcConfig": {
+        "version": "0.8.24",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.24"
+      ],
+      "artifacts": [
+        "Roulette"
       ]
     }
   }

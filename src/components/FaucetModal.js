@@ -2,18 +2,18 @@ import { useContext, useEffect, useState, memo } from "react";
 import { ethers } from "ethers";
 import { MyContext } from "./Context.js";
 import { CONTRACT_ADDRESS } from "../config.js";
-import * as CONTRACT_ABI from "../abi/Roulette.json";
+import * as CONTRACT_ABI from "../abi/FHERoulette.json";
 
 const Faucet = () => {
   const {
-    setBalance,
+    fetchOnchainBalance,
     faucetModal,
     setFaucetModal,
     account,
     nextClaimTime,
     setNextClaimTime,
     isAccountLoading,
-    fhevm
+    playSound
   } = useContext(MyContext);
 
   const [displayTime, setDisplayTime] = useState(0);
@@ -27,7 +27,6 @@ const Faucet = () => {
       setDisplayTime(0);
       return;
     }
-
 
     const tick = () => {
       if (nextClaimTime && nextClaimTime > 0) {
@@ -46,7 +45,6 @@ const Faucet = () => {
   }, [faucetModal, nextClaimTime, isAccountLoading]);
 
 
-
   const formatTime = (sec) => {
     const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
@@ -54,12 +52,11 @@ const Faucet = () => {
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
 
-
   //  Claim button
-const claimToken = async () => {
+  const claimToken = async () => {
     try {
-      if (!window.ethereum || !account || !fhevm) {
-        alert("Wallet is not connected or FHEVM is not initialized.");
+      if (!window.ethereum || !account) {
+        alert("Wallet is not connected");
         return;
       }
       setLoading(true);
@@ -67,7 +64,6 @@ const claimToken = async () => {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI.default.abi, signer);
-
 
       const remainingBN = await contract.getNextClaimTime(account);
       const remaining = Number(remainingBN);
@@ -81,79 +77,26 @@ const claimToken = async () => {
         return;
       }
 
-      // Send the faucet transaction with a manual gas limit
-      console.log("Sending claim transaction with manual gas limit...");
-      const tx = await contract.mintDemoBalance({
-        gasLimit: 2000000 
-      });
+      // Token Mint
+      const tx = await contract.mintDemoBalance();
+
       await tx.wait();
-      console.log("Claim transaction successful.");
 
-      // Withdraw the new balance CORRECTLY
-      const encryptedBalanceBytes = await contract.getBalance(account);
+      await fetchOnchainBalance(account);
 
-      // Decrypt the new balance using the CORRECT EIP-712 flow 
-      console.log("Decrypting new balance...");
-      const keypair = fhevm.generateKeypair();
-      const startTimestamp = Math.floor(Date.now() / 1000).toString();
-      const durationDays = "10";
-      const contractAddresses = [CONTRACT_ADDRESS];
-
-      const eip712 = fhevm.createEIP712(
-        keypair.publicKey,
-        contractAddresses,
-        startTimestamp,
-        durationDays
-      );
-
-      const signature = await signer.signTypedData(
-        eip712.domain,
-        {
-          UserDecryptRequestVerification:
-            eip712.types.UserDecryptRequestVerification,
-        },
-        eip712.message
-      );
-
-      const result = await fhevm.userDecrypt(
-        [
-          {
-            handle: encryptedBalanceBytes,
-            contractAddress: CONTRACT_ADDRESS,
-          },
-        ],
-        keypair.privateKey,
-        keypair.publicKey,
-        signature.replace("0x", ""),
-        contractAddresses,
-        signer.address,
-        startTimestamp,
-        durationDays
-      );
-
-      const decryptedBalance = result[encryptedBalanceBytes];
-      setBalance(Number(decryptedBalance));
-      console.log("New balance decrypted:", decryptedBalance);
-
-      // update timer
+      // set countdown for 24 hours
       const now = Date.now();
       const newNextTime = now + (24 * 60 * 60 * 1000);
       setNextClaimTime(newNextTime);
       localStorage.setItem("nextClaimTime", String(newNextTime));
 
+      playSound("claim");
       alert("✅ 100 token transferred successfully!");
+      setFaucetModal(false); // Close the modal
+
     } catch (err) {
       console.error("Claim error:", err);
-
-      if (err.reason) {
-         alert(`Claim transaction unsuccessful: ${err.reason}`);
-      } else if (err.message && (err.message.includes("Wait 24h") || (err.data && err.data.includes("Wait 24h")))) {
-         alert("Claim transaction unsuccessful: Wait 24h before next claim");
-      } else if (err.code === 'ACTION_REJECTED') {
-         alert("Transaction rejected by user.");
-      } else {
-         alert("Claim transaction unsuccessful! (See console for details)");
-      }
+      alert("Claim failed: " + (err.reason || err.message));
     } finally {
       setLoading(false);
     }

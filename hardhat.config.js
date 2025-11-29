@@ -20,6 +20,9 @@ const config = {
       url: RPC_URL,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
     },
+  },
+  fhevm: {
+    network: "sepolia"
   }
 };
 export default config;

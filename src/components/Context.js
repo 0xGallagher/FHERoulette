@@ -1,17 +1,20 @@
-import { Buffer } from "buffer";
 import { createContext, useEffect, useState, useRef, useCallback } from "react";
 import $ from "jquery";
 import { ethers } from "ethers";
 import { CONTRACT_ADDRESS } from "../config.js";
-import * as CONTRACT_ABI from "../abi/Roulette.json";
+import * as CONTRACT_ABI from "../abi/FHERoulette.json";
 
 import { initSDK, createInstance, SepoliaConfig } from "@zama-fhe/relayer-sdk/web";
 
-window.Buffer = Buffer;
+import spinSnd from "../assets/sounds/spin.mp3";
+import winSnd from "../assets/sounds/win.mp3";
+import loseSnd from "../assets/sounds/lose.mp3";
+import chipSnd from "../assets/sounds/chip.mp3";
+import claimSnd from "../assets/sounds/claim.mp3";
+import cancelSnd from "../assets/sounds/cancel.mp3";
+import betSnd from "../assets/sounds/bet.mp3";
 
 export const MyContext = createContext();
-
-
 
 const Context = (props) => {
 
@@ -73,7 +76,7 @@ const Context = (props) => {
 
   const [chip, setChip] = useState(20);                        // active chip money
 
-  const selectChip = (num) => { setChip(num) };                  // chip amount changing function
+  const selectChip = (num) => { setChip(num); playSound("chip"); };   // chip amount changing function
 
   const [account, setAccount] = useState(null);
   const [balance, setBalance] = useState(0);                    // balance constant
@@ -97,85 +100,218 @@ const Context = (props) => {
   const [isTxLoading, setIsTxLoading] = useState(false);        // for tx loading animation
 
 
-  const play = async () => {
-    const activeBetsPlain = buttons
-      .filter((b) => b.betAmount > 0)
-      .map((b) => ({
-        id: Number(b.id),
-        amount: b.betAmount,
-      }));
+  const [fhevmInstance, setFhevmInstance] = useState(null);
 
-    if (totalBet <= 0 || activeBetsPlain.length === 0) {
-      alert("Please place your bets before the game starts.");
-      return;
-    }
-    if (!fhevm || !account) {
-      alert("FHEVM instance not ready. Please reconnect wallet.");
-      return;
-    }
+
+
+  /*  fhevm instance */
+
+  const isInitialized = useRef(false);
+
+  useEffect(() => {
+    const initFhevm = async () => {
+      // If already initialized, STOP.
+      if (isInitialized.current) return;
+
+      if (!window.crossOriginIsolated) {
+        console.log("Waiting for COOP/COEP headers...");
+        return;
+      }
+
+      isInitialized.current = true;
+
+      try {
+        try {
+          const initPromise = initSDK();
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("SDK init timeout")), 15000)
+          );
+          await Promise.race([initPromise, timeoutPromise]);
+        } catch (initError) {
+          console.warn("SDK initialization failed (network issue or environmental problem):");
+          console.warn(`Reason: ${initError.message}`);
+        }
+
+        if (window.ethereum) {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const network = await provider.getNetwork();
+
+          if (Number(network.chainId) === 11155111) {
+            try {
+              const config = { ...SepoliaConfig, network: window.ethereum };
+              const instance = await createInstance(config);
+              setFhevmInstance(instance);
+              console.log("✅ Zama FHEVM Instance READY!");
+            } catch (instanceError) {
+              console.warn("FHEVM Instance could not be created:");
+              console.warn(`Reason: ${instanceError.message}`);
+            }
+          } else {
+            alert("Please switch to the Sepolia network.");
+          }
+        } else {
+          alert("Metamask not found! Please install Metamask.");
+        }
+      } catch (error) {
+        console.error("Unexpected error during FHEVM initialization:", error);
+      }
+    };
+
+    initFhevm();
+  }, []);
+
+
+
+
+
+
+
+const calculateLocalGain = (winningNum, bets) => {
+    let totalWin = 0;
+    const winStr = String(winningNum);
+
+    bets.forEach(bet => {
+      const btnData = buttons.find(b => Number(b.id) === Number(bet.id));
+      
+      if (!btnData) {
+          console.warn(`⚠️ Button data not found for ID: ${bet.id}`);
+          return;
+      }
+
+      const amount = Number(bet.amount || 0); 
+      const multiplier = Number(btnData.multiple || 0);
+
+      if (btnData.value === winStr) {
+         const gain = amount * 36;
+         console.log(`✅ ID: ${bet.id}, Amount: ${amount}, Win: ${gain}`);
+         totalWin += gain;
+      }else if (btnData.nums && btnData.nums.includes(winStr)) {
+         const gain = amount * multiplier;
+         totalWin += gain;
+      }
+    });
+
+    return totalWin;
+  };
+
+const play = async () => {
+    // ---1. Controls---
+    if (!fhevmInstance) { alert("⚠️ SDK not ready"); return; }
+    
+    const activeBets = buttons
+      .filter(b => b.betAmount > 0)
+      .map(b => ({
+        id: Number(b.id),
+        amount: Number(b.betAmount)
+      }));
+    
+    if (activeBets.length === 0) { alert("Please place a bet."); return; }
+
+    const betIds = activeBets.map(b => b.id); 
+    const betAmounts = activeBets.map(b => b.amount);
 
     setPlayable(false);
     setWinnerEffect("none");
     setbConState(true);
-    setLastBet([...buttons]);
+    
+    setLastBet(buttons.map(elm => elm.id ? { 
+        ...elm, 
+        betAmount: buttons.filter(el => el.id === elm.id)[0].betAmount, 
+        class: buttons.filter(el => el.id === elm.id)[0].class 
+    } : null));
     setLastTotalBet(totalBet);
-    setButtons((btns) =>
-      btns.map((b) => ({ ...b, betAmount: 0, class: b.class.replace("bet-active", "") }))
-    );
+
+    // clear bets
+    setButtons(buttons.map(elm => {
+      elm.class = elm.class.replace("bet-active", "");
+      elm.betAmount = 0;
+      return elm;
+    }));
     setTotalBet(0);
 
     try {
+      if (!window.ethereum || !account) throw new Error("Wallet is not connected");
+      
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI.default.abi, signer);
+      const validContractAddress = ethers.getAddress(CONTRACT_ADDRESS);
+      const contract = new ethers.Contract(validContractAddress, CONTRACT_ABI.default.abi, signer);
 
-      const encryptedBets = [];
-      for (const bet of activeBetsPlain) {
-        const encrypted = await fhevm.encryptInput(bet.amount, { type: "euint64" });
-        encryptedBets.push({ id: bet.id, amount: encrypted });
-      }
+      // --- 2. encryption ---
+      //console.log("🔐 Encrypting...", betAmounts);
+      const input = fhevmInstance.createEncryptedInput(validContractAddress, account);
+      betAmounts.forEach(amount => input.add32(amount));
+      const encryptedInput = await input.encrypt();
 
-      console.log("🎰 Sending encrypted bets...");
-      const tx = await contract.play(encryptedBets, "0x");
+      // --- 3. contract call ---
+      //console.log("📨 Sending...");
+      const tx = await contract.play(
+        betIds, 
+        encryptedInput.handles, 
+        encryptedInput.inputProof,
+        { gasLimit: 5000000 }
+      );
+
+      //console.log("⏳ Waiting for confirmation...");
       setIsTxLoading(true);
       const receipt = await tx.wait();
       setIsTxLoading(false);
+      //console.log("✅ Confirmed!");
 
-      // Find the GamePlayed event (decode from logs)
-      const iface = new ethers.Interface(CONTRACT_ABI.default.abi);
-      const gameEvent = receipt.logs
-        .map((log) => {
-          try {
-            return iface.parseLog(log);
-          } catch {
-            return null;
+      // fetching result
+      const log = receipt.logs.find(log => {
+         try { return contract.interface.parseLog(log)?.name === "GamePlayed"; } 
+         catch (e) { return false; }
+      });
+      
+      if (!log) throw new Error("Event not found");
+      const parsedLog = contract.interface.parseLog(log);
+      const encryptedWinningNumber = parsedLog.args[0].toString(); 
+      
+      let winningNumber = 0;
+      try {
+          const decryptResult = await fhevmInstance.publicDecrypt([encryptedWinningNumber]);
+          
+          const parseSecureNumber = (val) => {
+             if (val === null || val === undefined) return null;
+             if (typeof val === 'bigint') return Number(val);
+             if (typeof val === 'number') return val;
+             if (typeof val === 'string') return Number(val);
+             if (Array.isArray(val)) return parseSecureNumber(val[0]);
+             if (typeof val === 'object') {
+                 const values = Object.values(val);
+                 if (values.length > 0) return parseSecureNumber(values[0]);
+             }
+             return null;
+          };
+
+          const cleanNumber = parseSecureNumber(decryptResult);
+
+          if (cleanNumber !== null && !isNaN(cleanNumber)) {
+              winningNumber = cleanNumber;
+              //console.log("DECRYPT SUCCESSFUL: ", winningNumber);
+          } else {
+              winningNumber = 0; 
           }
-        })
-        .find((ev) => ev && ev.name === "GamePlayed");
 
-      if (!gameEvent) throw new Error("No GamePlayed event found");
+      } catch (err) {
+          console.error("Decrypt Error:", err);
+          winningNumber = 0;
+      }
 
-      const { winningNumber, winningsHandle, newBalanceHandle } = gameEvent.args;
-      console.log("🏁 Decrypting results...");
-
-      const decryptedWinnings = await decryptWithEIP712(fhevm, signer, winningsHandle);
-      const decryptedBalance = await decryptWithEIP712(fhevm, signer, newBalanceHandle);
-
-      const didWin = Number(decryptedWinnings) > 0;
-      console.log(`🎯 Winning number: ${winningNumber}, gain: ${decryptedWinnings}, balance: ${decryptedBalance}`);
-
-      // Animate result
-      const winnerNumObj =
-        buttons.find((elm) => elm.value === String(winningNumber)) ||
-        buttons.find((elm) => elm.value === "0");
+      // animation
+      let winValStr = String(winningNumber);
+      let winnerNumObj = buttons.find(elm => elm.value === winValStr);
+      if (!winnerNumObj) winnerNumObj = buttons.find(elm => elm.value === "0");
 
       const targetAngle = (parseFloat(winnerNumObj.min) + parseFloat(winnerNumObj.max)) / 2;
+      
       const baseRotate = rotate;
       const baseRotate2 = rotate2;
-      const newRotate2 = baseRotate2 - (Math.random() * 1000 + 1000);
+      let newRotate2 = baseRotate2 - (Math.random() * 1000 + 1000);
       const totalSpins = Math.floor(Math.random() * 5) + 10;
       const currentAngle = baseRotate % 360;
-      let newRotate1 = baseRotate - currentAngle + totalSpins * 360 + (newRotate2 % 360) + targetAngle;
+      let newRotate1 = baseRotate - currentAngle + (totalSpins * 360) + (newRotate2 % 360) + targetAngle;
 
       setHideBall(false);
       setShowItemBall(false);
@@ -183,25 +319,61 @@ const Context = (props) => {
       setRotate2(newRotate2);
       setWinnerNumber(winnerNumObj.value);
 
-      setTimeout(() => {
+      playSound("spin-start");
+
+      setTimeout(async () => {
+        playSound("spin-stop");
         setHideBall(true);
         setShowItemBall(true);
         setbConState(false);
         setLastNums([winnerNumObj.value, ...lastNums]);
-        setBalance(Number(decryptedBalance));
-        setGain(Number(decryptedWinnings));
-        setWinnerEffect(didWin ? "gained" : "lost");
-        setTurn((t) => t + 1);
+
+        const localWinnings = calculateLocalGain(winningNumber, activeBets);
+        
+        //console.log(`✅ FINAL STATUS -> Number: ${winningNumber}, Winnings: ${localWinnings}`);
+
+        if (localWinnings > 0) {
+            setBalance(prev => prev + localWinnings);
+            setGain(localWinnings);
+            setWinnerEffect("gained");
+            playSound("win");
+        } else {
+            setGain(0);
+            setWinnerEffect("lost");
+            playSound("lose");
+        }
+        
+        setTurn(turn + 1);
         setPlayable(true);
       }, 10200);
+
     } catch (err) {
-      console.error("❌ Play error:", err);
-      alert("Transaction failed or rejected.");
-      setIsTxLoading(false);
+      console.error("General Error:", err);
+      alert("❌ Error: " + (err.reason || err.message));
       setPlayable(true);
       setbConState(false);
+      setIsTxLoading(false);
+      fetchOnchainBalance(account);
     }
   };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
   useEffect(() => {
@@ -237,6 +409,7 @@ const Context = (props) => {
       !tempAry.class.includes("bet-active") ? tempAry.class += " bet-active" : tempAry.class += ""                         // if clicked with left, and we have balance do these
       setBalance(balance - chip)
       setTotalBet(totalBet + chip)
+      playSound("bet");
     } else if (stat === "del") {                                                                                                // if we clicked with right, delete chip amound by active chip
       e.preventDefault()
 
@@ -250,10 +423,11 @@ const Context = (props) => {
         setBalance(balance + chip)
         setTotalBet(totalBet - chip)
       }
+      playSound("cancel");
     }
 
-    tempAry.class = updateBetChipBackground(tempAry.class, tempAry.betAmount)                                                         // color of the chip depends on bet amount
-    setButtons(buttons.map(elm => elm.id === num ? tempAry : elm))                                                            // updating main array
+    tempAry.class = updateBetChipBackground(tempAry.class, tempAry.betAmount);                                                         // color of the chip depends on bet amount
+    setButtons(buttons.map(elm => elm.id === num ? tempAry : elm));
   }
 
 
@@ -306,60 +480,65 @@ const Context = (props) => {
         setAnimation(false)
       }, 3000)
     }
-  }, [winnerEffect])
+  }, [winnerEffect]);
 
 
 
 
+  
 
+  // SFX
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  /* -------------------------------------------------- */
-
-
-
-
-
-  const [fhevm, setFhevm] = useState(null);
-
-  const initializeFhevmInstance = async () => {
-    if (!window.ethereum) {
-      alert("MetaMask not detected.");
-      return null;
+  const spinAudioRef = useRef(new Audio(spinSnd));
+  
+  const playSound = (type) => {
+    let audio;
+    switch (type) {
+      case "chip":
+        audio = new Audio(chipSnd);
+        audio.volume = 0.5;
+        break;
+      case "win":
+        audio = new Audio(winSnd);
+        audio.volume = 0.8;
+        break;
+      case "lose":
+        audio = new Audio(loseSnd);
+        audio.volume = 0.6;
+        break;
+      case "claim":
+        audio = new Audio(claimSnd);
+        audio.volume = 0.7;
+        break;
+      case "cancel":
+        audio = new Audio(cancelSnd);
+        audio.volume = 0.6;
+        break;
+      case "bet":
+        audio = new Audio(betSnd);
+        audio.volume = 0.7;
+        break;
+      case "spin-start":
+        spinAudioRef.current.loop = true;
+        spinAudioRef.current.currentTime = 0;
+        spinAudioRef.current.volume = 0.6;
+        spinAudioRef.current.play().catch(e => console.warn("Audio play error:", e));
+        return;
+      case "spin-stop":
+        spinAudioRef.current.pause();
+        spinAudioRef.current.currentTime = 0;
+        return;
+      default:
+        return;
     }
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
-      const signer = await provider.getSigner();
-      const { chainId } = await provider.getNetwork();
-
-      if (Number(chainId) !== 11155111) {
-        alert("Please switch to Sepolia testnet.");
-        return null;
-      }
-
-      await initSDK();
-      const fheInstance = await createInstance(SepoliaConfig);
-      setFhevm(fheInstance);
-      return { fheInstance, provider, signer };
-    } catch (e) {
-      console.error("FHEVM initialization error:", e);
-      return null;
+    
+    if (audio) {
+        audio.play().catch(e => console.warn("Audio play error:", e));
     }
   };
+
+
+
 
 
 
@@ -374,198 +553,123 @@ const Context = (props) => {
 
   const [isAccountLoading, setIsAccountLoading] = useState(true);
 
-
-
-  const fetchOnchainBalance = useCallback(async (userAccount, fhevmInstance) => {
+  const fetchOnchainBalance = useCallback(async (account) => {
     try {
       setIsAccountLoading(true);
-      if (!window.ethereum || !userAccount || !fhevmInstance) return;
+      if (!window.ethereum || !account) return;
+
+      const validContractAddress = ethers.getAddress(CONTRACT_ADDRESS);
+      const validUserAddress = ethers.getAddress(account);
 
       const provider = new ethers.BrowserProvider(window.ethereum);
+      const network = await provider.getNetwork();
+
+      if (Number(network.chainId) !== 11155111) {
+        alert("Please switch your network to Sepolia Test Network!");
+        return;
+      }
+
       const signer = await provider.getSigner();
-      const contract = new ethers.Contract(
-        CONTRACT_ADDRESS,
-        CONTRACT_ABI.default.abi,
-        provider
-      );
+      const contract = new ethers.Contract(validContractAddress, CONTRACT_ABI.default.abi, signer);
 
-      // Fetch encrypted balance handle
-      const encryptedBalanceHandle = await contract.getBalance(userAccount);
-
-      console.log(`[DEBUG] contract.getBalance(${userAccount}) fonksiyonundan dönen ham handle:`, encryptedBalanceHandle);
-      
-      const EMPTY_HANDLE = "0x0000000000000000000000000000000000000000000000000000000000000000";
-      let decryptedBalanceValue = 0;
-
-      //control start
-
-      if (encryptedBalanceHandle && encryptedBalanceHandle !== EMPTY_HANDLE) {
-        console.log("Geçerli bakiye handle'ı bulundu, şifre çözülüyor...");
-
-        //  Generate keypair & EIP-712
-        const keypair = fhevmInstance.generateKeypair();
-        const startTimestamp = Math.floor(Date.now() / 1000).toString();
-        const durationDays = "10";
-        const contractAddresses = [CONTRACT_ADDRESS];
-
-        const eip712 = fhevmInstance.createEIP712(
-          keypair.publicKey,
-          contractAddresses,
-          startTimestamp,
-          durationDays
-        );
-
-        //  Sign the typed data
-        const signature = await signer.signTypedData(
-          eip712.domain,
-          {
-            UserDecryptRequestVerification:
-              eip712.types.UserDecryptRequestVerification,
-          },
-          eip712.message
-        );
-
-        // Call userDecrypt()
-        const result = await fhevmInstance.userDecrypt(
-          [
-            {
-              handle: encryptedBalanceHandle,
-              contractAddress: CONTRACT_ADDRESS,
-            },
-          ],
-          keypair.privateKey,
-          keypair.publicKey,
-          signature.replace("0x", ""),
-          contractAddresses,
-          signer.address,
-          startTimestamp,
-          durationDays
-        );
-
-        decryptedBalanceValue = result[encryptedBalanceHandle];
-      } else {
-        console.log("Kullanıcı için bakiye kaydı bulunamadı (handle boş). Bakiye 0 olarak ayarlandı.");
+      // faucet countdown control
+      try {
+        const remainingOnChain = await contract.getNextClaimTime(validUserAddress);
+        const remainingNum = Number(remainingOnChain);
+        if (remainingNum > 0) {
+          const newNextClaimTime = Date.now() + (remainingNum * 1000);
+          setNextClaimTime(newNextClaimTime);
+          localStorage.setItem("nextClaimTime", String(newNextClaimTime));
+        } else {
+          setNextClaimTime(0);
+          localStorage.removeItem("nextClaimTime");
+        }
+      } catch (e) {
+        console.warn("Claim countdown error:", e);
       }
-      // --- control over ---
 
-      setBalance(Number(decryptedBalanceValue));
-
-      // Get next faucet claim time
-      const remaining = await contract.getNextClaimTime(userAccount);
-      const remainingNum = Number(remaining);
-
-      if (remainingNum > 0) {
-        const newNextClaimTime = Date.now() + remainingNum * 1000;
-        setNextClaimTime(newNextClaimTime);
-        localStorage.setItem("nextClaimTime", String(newNextClaimTime));
-      } else {
-        setNextClaimTime(0);
-        localStorage.removeItem("nextClaimTime");
+      if (!fhevmInstance) {
+        console.log("SDK his not ready.");
+        return;
       }
-    } catch (err) {
-      console.error("Error while fetching balance:", err);
-      setBalance(0);
-      setNextClaimTime(0);
-    } finally {
-      setIsAccountLoading(false);
-    }
-  }, []); 
 
+      //console.log("🔐 Balance has been fetching...");
+      const encryptedBalanceHandle = await contract.getBalance(validUserAddress);
 
- 
-  useEffect(() => {
-    if (account && fhevm) {
-      fetchOnchainBalance(account, fhevm);
-    }
-  }, [account, fhevm, fetchOnchainBalance]);
+      const ZERO_HANDLE = "0x0000000000000000000000000000000000000000000000000000000000000000";
+      if (encryptedBalanceHandle === ZERO_HANDLE) {
+        console.log("Balance 0 (Uninitialized).");
+        setBalance(0);
+        return;
+      }
 
-
-
-
-
-  const connectWallet = async () => {
-    const initData = await initializeFhevmInstance();
-    if (initData?.signer) {
-      const userAccount = await initData.signer.getAddress();
-      setAccount(userAccount);
-    } else {
-      alert("Failed to initialize FHEVM.");
-    }
-  };
-  
-
-  const disconnectWallet = () => {
-    setAccount(null);
-    setBalance(0);
-    setFhevm(null);
-    localStorage.removeItem("nextClaimTime");
-  };
-
-
-
-
-
-
-
-  const decryptWithEIP712 = async (instance, signer, ciphertextHandle) => {
-    
-    const EMPTY_HANDLE = "0x0000000000000000000000000000000000000000000000000000000000000000";
-    if (!ciphertextHandle || ciphertextHandle === EMPTY_HANDLE) {
-      console.log("decryptWithEIP712: Boş handle alındı, şifre çözme atlandı. 0 döndürülüyor.");
-      return 0;
-    }
-
-    try {
-      const keypair = instance.generateKeypair();
+      const keypair = fhevmInstance.generateKeypair();
       const startTimeStamp = Math.floor(Date.now() / 1000).toString();
-
       const durationDays = "10";
-      const contractAddresses = [CONTRACT_ADDRESS];
 
-      const eip712 = instance.createEIP712(
+      const eip712 = fhevmInstance.createEIP712(
         keypair.publicKey,
-        contractAddresses,
+        [validContractAddress],
         startTimeStamp,
         durationDays
       );
 
+      const types = { ...eip712.types };
+      if (types.EIP712Domain) delete types.EIP712Domain;
+
+      //console.log("Waiting for signature...");
       const signature = await signer.signTypedData(
         eip712.domain,
-        {
-          UserDecryptRequestVerification:
-            eip712.types.UserDecryptRequestVerification,
-        },
+        types,
         eip712.message
       );
 
-      const result = await instance.userDecrypt(
-        [
-          {
-            handle: ciphertextHandle,
-            contractAddress: CONTRACT_ADDRESS,
-          },
-        ],
+      //console.log("Decrypting...");
+
+      const handleContractPairs = [{
+        handle: encryptedBalanceHandle,
+        contractAddress: validContractAddress
+      }];
+
+      const resultObj = await fhevmInstance.userDecrypt(
+        handleContractPairs,
         keypair.privateKey,
         keypair.publicKey,
         signature.replace("0x", ""),
-        contractAddresses,
-        signer.address,
+        [validContractAddress],
+        validUserAddress,
         startTimeStamp,
         durationDays
       );
 
-      return result[ciphertextHandle];
+      const balanceResult = resultObj[encryptedBalanceHandle];
+
+      if (balanceResult === null || balanceResult === undefined) {
+        setBalance(0);
+      } else {
+        //console.log("Balance:", balanceResult);
+        setBalance(Number(balanceResult));
+      }
+
     } catch (err) {
-      console.error("Decryption error:", err);
-      return 0;
+      console.error("Balance error:", err);
+      setBalance(0);
+    } finally {
+      setIsAccountLoading(false);
     }
-  };
+  }, [fhevmInstance]);
 
 
-
-
-
-
+  useEffect(() => {
+    if (account) {
+      fetchOnchainBalance(account);
+    } else {
+      setBalance(0);
+      setNextClaimTime(0);
+      localStorage.removeItem("nextClaimTime");
+      setIsAccountLoading(false);
+    }
+  }, [account, fetchOnchainBalance]);
 
 
 
@@ -573,9 +677,6 @@ const Context = (props) => {
 
 
   /* --------------------------------------*/
-
-
-
 
 
   const svgContainer = useRef()
@@ -830,9 +931,8 @@ const Context = (props) => {
       setNextClaimTime,
       isAccountLoading,
       isTxLoading,
-      connectWallet,
-      disconnectWallet,
-      fhevm,
+      fetchOnchainBalance,
+      playSound
     }}>
       {props.children}
     </MyContext.Provider>

@@ -2,11 +2,12 @@ import pkg from "hardhat";
 const { ethers } = pkg;
 
 async function main() {
-  const Contract = await ethers.getContractFactory("Roulette");
+  const Contract = await ethers.getContractFactory("FHERoulette");
   const contract = await Contract.deploy();
-  
-  const contractAddress = await contract.getAddress();
-  console.log("Roulette deployed to:", contractAddress);
+
+  await contract.waitForDeployment();
+
+  console.log("Roulette deployed to:", await contract.getAddress());
 }
 
 main().catch((err) => {
