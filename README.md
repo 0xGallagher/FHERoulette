@@ -16,7 +16,7 @@ A fully on-chain Roulette game powered by Fully Homomorphic Encryption (FHE). Pl
 
 This isn't average blockchain casino game. Most DApps expose every move you make. In this Roulette game, we utilize Zama's fhEVM technology.
 
-Here is the magic: The Smart Contract performs calculations on encrypted data without ever decrypting it.
+The Smart Contract performs calculations on encrypted data without ever decrypting it.
 
 Encrypted Inputs: When you place a bet, the amount is encrypted before it leaves your browser. The blockchain sees the transaction, but not the value.
 
@@ -28,8 +28,6 @@ Provably Fair: The winning number is generated on-chain using FHE.randEuint8 and
 </br>
 
 ### <img src="./src/assets/img/zamacasino.png" width="20" /> Gameplay
-
-Here is the lifecycle of a single game round:
 
 Betting: You select your numbers amount by left clicking on the board and the chip section in right side.
 
@@ -113,11 +111,13 @@ Install Dependencies:
 npm install
 ```
 
+
 Configure Headers (Crucial!): FHE uses WebAssembly and multithreading, which requires specific security headers (Cross-Origin-Opener-Policy and Cross-Origin-Embedder-Policy).
 
 We handle this via coi-serviceworker or server configuration.
 
 If running locally: Ensure your dev server sends these headers.
+
 
 
 Run the Application:
