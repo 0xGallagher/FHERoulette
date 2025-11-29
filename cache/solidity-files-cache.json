@@ -229,42 +229,6 @@
         "^0.8.24"
       ],
       "artifacts": []
-    },
-    "C:\\Users\\Sedat Yetiş\\Desktop\\Oyun, Kitap, Eğlence\\React\\React Tutorial\\Tekrar\\Zamacasino\\contracts\\Roulette.sol": {
-      "lastModificationDate": 1763480730657,
-      "contentHash": "6e3ee9f01f64a04e9003c4e4fb2e789b",
-      "sourceName": "contracts/Roulette.sol",
-      "solcConfig": {
-        "version": "0.8.24",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "evmVersion": "paris",
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [],
-      "versionPragmas": [
-        "^0.8.24"
-      ],
-      "artifacts": [
-        "Roulette"
-      ]
     }
   }
 }
